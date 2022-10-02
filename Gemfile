@@ -20,6 +20,7 @@ gem 'bootsnap',   '1.10.3', require: false
 gem 'net-smtp', require: false
 gem 'net-imap', require: false
 gem 'net-pop', require: false
+gem 'psych', '~> 3.1'
 
 group :development, :test do
   gem 'sqlite3', '1.4.1'
@@ -45,7 +46,7 @@ group :test do
 end
 
 group :production do
-  gem 'pg', '1.1.4', group: :production
+  gem 'pg', '1.1.4'
 end
 
 # Windows ではタイムゾーン情報用の tzinfo-data gem を含める必要があります
