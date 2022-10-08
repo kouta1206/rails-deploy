@@ -11,62 +11,55 @@ jobs:
     name: Test
     runs-on: ubuntu-latest
 
-  steps:
-    - uses: actions/checkout@v2
+    steps:
+      - uses: actions/checkout@v2
 
-    - uses: ruby/setup-ruby@v1
-      with:
-        ruby-version: 2.6.8
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: 2.6.8
 
-    - name: Cache bundle
-      uses: actions/cache@v2
-      with:
-        path: vendor/bundle
-        key: bundle-v1-${{ hashFiles('Gemfile.lock') }}
+      - name: Cache bundle
+        uses: actions/cache@v2
+        with:
+          path: vendor/bundle
+          key: bundle-v1-${{ hashFiles('Gemfile.lock') }}
 
-    - uses: actions/setup-node@v2
-      with:
-        node-version: 16
+      - name: Run bundle install
+        run: |
+          bundle config --local path vendor/bundle
+          bundle config --local without production
+          bundle install
+      - name: Cache yarn
+        uses: actions/cache@v2
+        with:
+          path: node_modules
+          key: yarn-v1-${{ hashFiles('yarn.lock') }}
 
-    - name: Run bundle install
-      run: |
-        bundle config --local path vendor/bundle
-        bundle config --local without production
-        bundle install
+      - run: RAILS_ENV=test bundle exec rails assets:precompile
 
-    - name: Cache yarn
-      uses: actions/cache@v2
-      with:
-        path: node_modules
-        key: yarn-v1-${{ hashFiles('yarn.lock') }}
+      - run: bundle exec rails test
 
-    - run: RAILS_ENV=test bundle exec rails assets:precompile
+  deploy:
+    name: Deploy app to AWS
+    needs: test
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
 
-    - run: bundle exec rails test
-
-    deploy:
-      name: Deploy app to AWS
-      needs: test
-      if: github.ref == 'refs/heads/main'
-      runs-on: ubuntu-latest
-
-  steps:
+    steps:
       - name: Install SSH key
         run: |
           mkdir -p -m 700 ~/.ssh
           echo "${{ secrets.SSH_KEY }}" > ~/.ssh/rails-deploy-webapp
           chmod 600 ~/.ssh/rails-deploy-webapp
-
-
-    - name: Deploy
-      run: |
-        eval $(ssh-agent)
-        ssh-add ~/.ssh/rails-deploy-webapp
-        ssh -o StrictHostKeyChecking=no -A webapp@${{ secrets.TARGET_HOSTNAME }} "cd rails-deploy &&
-        git pull origin main &&
-        ~/.rbenv/shims/bundle config --local deployment true &&
-        ~/.rbenv/shims/bundle config --local without development:test &&
-        ~/.rbenv/shims/bundle install &&
-        RAILS_ENV=production ~/.rbenv/shims/bundle exec rails assets:precompile &&
-        RAILS_ENV=production ~/.rbenv/shims/bundle exec rails db:migrate &&
-        ~/.rbenv/shims/bundle exec pumactl restart"
+      - name: Deploy
+        run: |
+          eval $(ssh-agent)
+          ssh-add ~/.ssh/rails-deploy-webapp
+          ssh -o StrictHostKeyChecking=no -A webapp@${{ secrets.TARGET_HOSTNAME }} "cd rails-deploy &&
+          git pull origin main &&
+          ~/.rbenv/shims/bundle config --local deployment true &&
+          ~/.rbenv/shims/bundle config --local without development:test &&
+          ~/.rbenv/shims/bundle install &&
+          RAILS_ENV=production ~/.rbenv/shims/bundle exec rails assets:precompile &&
+          RAILS_ENV=production ~/.rbenv/shims/bundle exec rails db:migrate &&
+          ~/.rbenv/shims/bundle exec pumactl restart"
